@@ -32,7 +32,7 @@ public class ProductPanel extends JPanel {
 
         alertesButton.addActionListener(e -> {
             ProductDAO dao = new ProductDAO();
-            List<Product> produitsCritiques = dao.getProduitsÀReconstituer();
+            List<Product> produitsCritiques = dao.getProductsToRestock();
 
             String[] columns = { "ID", "Titre", "Acteur", "Prix", "Catégorie" };
             String[][] data = new String[produitsCritiques.size()][5];

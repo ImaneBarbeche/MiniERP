@@ -28,6 +28,17 @@ private static final String PASSWORD = "root";
 
 ---
 
+## 🧱 Structure MCD
+
+---
+[Customer] ───< [Order] >─── [OrderLine] ───> [Product]
+     |              |               |               |
+customerid     orderid         prod_id         prod_id
+firstname      orderdate       quantity        title
+lastname       netamount                        actor
+email          tax                              price
+username       totalamount                      category
+
 ## 🚀 Consignes de lancement
 
 1. Cloner le dépôt :

@@ -3,20 +3,35 @@ package src.com.minierp.dao;
 import java.sql.*;
 import java.util.Map;
 
+/**
+ * DAO responsable de la création des commandes client.
+ * Effectue l’insertion des commandes, des lignes de commande, et la mise à jour des stocks.
+ */
 public class OrderDAO {
 
+    /**
+     * Crée une commande pour un client donné à partir d’un panier de produits (quantité par produit).
+     * Cette opération effectue plusieurs étapes en une seule transaction :
+     * - Calcul du montant
+     * - Insertion de la commande
+     * - Insertion des lignes de commande
+     * - Mise à jour du stock
+     *
+     * @param customerId         L'identifiant du client passant commande.
+     * @param productQuantities  Une map contenant les identifiants de produits et leur quantité.
+     * @throws SQLException si une erreur survient pendant la transaction.
+     */
     public void createOrder(int customerId, Map<Integer, Integer> productQuantities) throws SQLException {
         Connection conn = null;
         try {
             conn = DatabaseManager.getConnection();
             conn.setAutoCommit(false); // ➜ DÉBUT de transaction
 
-            // 1. Insérer dans la table orders
-            String orderSQL = "INSERT INTO orders (customerid, orderdate, netamount, tax, totalamount) VALUES (?, NOW(), ?, ?, ?) RETURNING orderid";
+            // Étape 1 : Préparation du montant net de la commande
             double netAmount = 0.0;
             double taxRate = 0.2;
 
-            // Calcul net à partir des produits
+            // Calcule le total HT en récupérant le prix de chaque produit
             for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
                 int productId = entry.getKey();
                 int quantity = entry.getValue();
@@ -31,10 +46,12 @@ public class OrderDAO {
                 rs.close();
                 priceStmt.close();
             }
-
             double tax = netAmount * taxRate;
             double total = netAmount + tax;
-
+            
+            // Étape 2 : Insertion dans la table orders
+            String orderSQL = "INSERT INTO orders (customerid, orderdate, netamount, tax, totalamount) VALUES (?, NOW(), ?, ?, ?) RETURNING orderid";
+            
             PreparedStatement orderStmt = conn.prepareStatement(orderSQL);
             orderStmt.setInt(1, customerId);
             orderStmt.setDouble(2, netAmount);
@@ -49,7 +66,7 @@ public class OrderDAO {
             orderRs.close();
             orderStmt.close();
 
-            // 2. Insérer dans la table orderlines
+             // Étape 3 : Insertion des lignes de commande
             for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
                 int productId = entry.getKey();
                 int quantity = entry.getValue();
@@ -62,7 +79,7 @@ public class OrderDAO {
                 insertLine.executeUpdate();
                 insertLine.close();
             }
-            // 3. Met à jour les stocks
+            // Étape 4 : Mise à jour du stock dans inventory
             String updateStockSql = "UPDATE inventory SET quan_in_stock = quan_in_stock - ? WHERE prod_id = ?";
             try (PreparedStatement updateStmt = conn.prepareStatement(updateStockSql)) {
                 for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
@@ -71,9 +88,9 @@ public class OrderDAO {
 
                     updateStmt.setInt(1, quantityOrdered);
                     updateStmt.setInt(2, productId);
-                    updateStmt.addBatch();
+                    updateStmt.addBatch(); // Ajoute à la liste des requêtes batch
                 }
-                updateStmt.executeBatch();
+                updateStmt.executeBatch(); // Exécute toutes les mises à jour de stock
             }
 
             conn.commit(); // ✅ OK tout s’est bien passé
@@ -85,7 +102,7 @@ public class OrderDAO {
             throw e;
         } finally {
             if (conn != null)
-                conn.close();
+                conn.close(); // Fermeture de la connexion
         }
     }
 }
